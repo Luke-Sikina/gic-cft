@@ -1,0 +1,111 @@
+Description: S3 Bucket for GIC Data Access
+
+Mappings:
+  # ELBAccountIDMapping:
+  #   us-east-1:
+  #     Id: '127311923021'
+
+Parameters:
+  InstitutionName:
+    Type: String
+    Description: The short name of your institution. BCH, CHOP, CCHMC...
+    Default: PROTO
+  UploaderAccounts:
+    Type: List<String>
+    Description:
+    Default: 302142166944,555035503484
+  ServiceWorkbenchAccount:
+    Type: String
+    Description: The AWS account ID of your service workbench account
+    Default: 555035503484
+  ExternalId:
+    Type: String
+    Description: A unique ID used to identify this account
+    Default: 12345
+  StudyBucketName:
+    Type: String
+    Description: The name of the S3 bucket for PIC-SURE to upload studies to
+    Default: StudyData
+
+Resources:
+  # Uploaders need PUT access to the S3 bucket, but nothing else
+  # Each institution has a single uploader, tied to their PIC-SURE node
+  DataUploader:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Join ['', [!Ref InstitutionName, UploadRole]]
+      AssumeRolePolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              AWS: !Ref UploaderAccounts
+            Action:
+              - s3:PutObject*
+            Resource:
+              - !Join ['', ['arn:aws:s3:::', !Ref StudyBucketName]]
+            Condition:
+              StringEquals:
+                sts:ExternalId: !Ref ExternalId
+
+  # The site owner runs a Service Workbench instance that needs
+  # Fairly universal access to the S3 bucket
+  SWBClient:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Join ['', [!Ref InstitutionName, SWBClientRole]]
+      AssumeRolePolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              AWS: !Ref UploaderAccounts
+            Resource:
+              - !Join ['', ['arn:aws:s3:::', !Ref StudyBucketName]]
+            Action:
+              - s3:*
+
+  # We need a bucket for uploading study data to
+  StudyBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Ref StudyBucketName
+      # BucketEncryption:
+      #   ServerSideEncryptionConfiguration:
+      #     - ServerSideEncryptionByDefault:
+      #         SSEAlgorithm: AES256
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      VersioningConfiguration:
+        Status: Enabled
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: ObjectWriter
+
+  # In addition to roles, buckets have policies? Idk why authorization is 
+  # fractured like this, but here's a policy
+  StudyBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref StudyBucket
+      PolicyDocument:
+        Statement:
+          - Sid: Deny requests that do not use TLS/HTTPS
+            Effect: Deny
+            Principal: '*'
+            Action: s3:*
+            Resource:
+              - !Join ['/', [!GetAtt LoggingBucket.Arn, '*']]
+              - !GetAtt LoggingBucket.Arn
+            Condition:
+              Bool:
+                aws:SecureTransport: false
+          # - Sid: Deny requests that do not use SigV4
+          #   Effect: Deny
+          #   Principal: '*'
+          #   Action: s3:*
+          #   Resource: !Join ['/', [!GetAtt LoggingBucket.Arn, '*']]
+          #   Condition:
+          #     StringNotEquals:
+          #       s3:signatureversion: 'AWS4-HMAC-SHA256'
