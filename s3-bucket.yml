@@ -1,19 +1,10 @@
 Description: S3 Bucket for GIC Data Access
 
-Mappings:
-  # ELBAccountIDMapping:
-  #   us-east-1:
-  #     Id: '127311923021'
-
 Parameters:
   InstitutionName:
     Type: String
-    Description: The short name of your institution. BCH, CHOP, CCHMC...
-    Default: PROTO
-  UploaderAccounts:
-    Type: List<String>
-    Description:
-    Default: 302142166944,555035503484
+    Description: The short name of your institution. bhc, chop (lowercase!)
+    Default: prototype
   ServiceWorkbenchAccount:
     Type: String
     Description: The AWS account ID of your service workbench account
@@ -22,10 +13,6 @@ Parameters:
     Type: String
     Description: A unique ID used to identify this account
     Default: 12345
-  StudyBucketName:
-    Type: String
-    Description: The name of the S3 bucket for PIC-SURE to upload studies to
-    Default: StudyData
 
 Resources:
   # Uploaders need PUT access to the S3 bucket, but nothing else
@@ -33,41 +20,58 @@ Resources:
   DataUploader:
     Type: AWS::IAM::Role
     Properties:
-      RoleName: !Join ['', [!Ref InstitutionName, UploadRole]]
+      RoleName: PicSureDataUploadRole
       AssumeRolePolicyDocument:
+        Version: '2012-10-17'
         Statement:
-          - Effect: Allow
+          - Effect: 'Allow'
             Principal:
-              AWS: !Ref UploaderAccounts
+              AWS: 555035503484
             Action:
-              - s3:PutObject*
-            Resource:
-              - !Join ['', ['arn:aws:s3:::', !Ref StudyBucketName]]
-            Condition:
-              StringEquals:
-                sts:ExternalId: !Ref ExternalId
+              - 'sts:AssumeRole'
+      Policies:
+        - PolicyName: PicSureDataUploadPolicy 
+          PolicyDocument:
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:* #TODO: change back to put*
+                Resource:
+                  - 'arn:aws:s3:::pic-sure-data-sharing-bucket*'
+                # Condition:
+                #   StringEquals:
+                #     sts:ExternalId: !Ref ExternalId
 
   # The site owner runs a Service Workbench instance that needs
   # Fairly universal access to the S3 bucket
   SWBClient:
     Type: AWS::IAM::Role
     Properties:
-      RoleName: !Join ['', [!Ref InstitutionName, SWBClientRole]]
+      RoleName: SWBDataConsumerRole
       AssumeRolePolicyDocument:
+        Version: '2012-10-17'
         Statement:
-          - Effect: Allow
+          - Effect: 'Allow'
             Principal:
-              AWS: !Ref UploaderAccounts
-            Resource:
-              - !Join ['', ['arn:aws:s3:::', !Ref StudyBucketName]]
+              AWS: 555035503484
             Action:
-              - s3:*
+              - 'sts:AssumeRole'
+      Policies:
+        - PolicyName: PicSureDataUploadPolicy 
+          PolicyDocument:
+            Statement:
+              - Effect: Allow
+                Resource:
+                  - !Join ['', ['arn:aws:s3:::pic-sure-data-sharing-bucket', !Ref InstitutionName, '/*']]
+                  - !Join ['', ['arn:aws:s3:::pic-sure-data-sharing-bucket', !Ref InstitutionName]]
+                Action:
+                  - s3:*
 
   # We need a bucket for uploading study data to
   StudyBucket:
     Type: AWS::S3::Bucket
     Properties:
-      BucketName: !Ref StudyBucketName
+      BucketName: !Join ['', ['pic-sure-data-sharing-bucket', !Ref InstitutionName]]
       # BucketEncryption:
       #   ServerSideEncryptionConfiguration:
       #     - ServerSideEncryptionByDefault:
@@ -88,16 +92,42 @@ Resources:
   StudyBucketPolicy:
     Type: AWS::S3::BucketPolicy
     Properties:
-      Bucket: !Ref StudyBucket
+      Bucket: !Join ['', ['pic-sure-data-sharing-bucket', !Ref InstitutionName]]
       PolicyDocument:
         Statement:
+        # Once I have kms key, restrict here
           - Sid: Deny requests that do not use TLS/HTTPS
             Effect: Deny
             Principal: '*'
             Action: s3:*
             Resource:
-              - !Join ['/', [!GetAtt LoggingBucket.Arn, '*']]
-              - !GetAtt LoggingBucket.Arn
+              - !Join ['', ['arn:aws:s3:::pic-sure-data-sharing-bucket', !Ref InstitutionName, '/*']]
+              - !Join ['', ['arn:aws:s3:::pic-sure-data-sharing-bucket', !Ref InstitutionName]]
+            Condition:
+              Bool:
+                aws:SecureTransport: false
+          - Sid: Allow PIC-SURE clients with uploader role
+            Effect: Allow
+            Principal:
+              AWS: 
+              - arn:aws:iam::555035503484:role/PicSureDataUploadRole
+              - arn:aws:iam::302142166944:role/PicSureDataUploadRole
+            Action: s3:PutObject*
+            Resource:
+              - !Join ['', ['arn:aws:s3:::pic-sure-data-sharing-bucket', !Ref InstitutionName, '/*']]
+              - !Join ['', ['arn:aws:s3:::pic-sure-data-sharing-bucket', !Ref InstitutionName]]
+            Condition:
+              Bool:
+                aws:SecureTransport: false
+          - Sid: Allow SWB clients with everything role
+            Effect: Allow
+            Principal:
+              AWS: 
+              - arn:aws:iam::555035503484:role/SWBDataConsumerRole
+            Action: s3:* #TODO: narrow permissions
+            Resource:
+              - !Join ['', ['arn:aws:s3:::pic-sure-data-sharing-bucket', !Ref InstitutionName, '/*']]
+              - !Join ['', ['arn:aws:s3:::pic-sure-data-sharing-bucket', !Ref InstitutionName]]
             Condition:
               Bool:
                 aws:SecureTransport: false

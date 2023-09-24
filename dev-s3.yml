@@ -1,0 +1,45 @@
+Description: S3 Bucket for GIC Data Access
+
+Parameters:
+  InstitutionName:
+    Type: String
+    Description: The short name of your institution. bhc, chop (lowercase!)
+    Default: prototype
+  ServiceWorkbenchAccount:
+    Type: String
+    Description: The AWS account ID of your service workbench account
+    Default: 302142166944
+  ExternalId:
+    Type: String
+    Description: A unique ID used to identify this account
+    Default: 12345
+
+Resources:
+  # Uploaders need PUT access to the S3 bucket, but nothing else
+  # Each institution has a single uploader, tied to their PIC-SURE node
+  DataUploader:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: PicSureDataUploadRole
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: 'Allow'
+            Principal:
+              AWS: 302142166944
+            Action:
+              - 'sts:AssumeRole'
+      Policies:
+        - PolicyName: PicSureDataUploadPolicy 
+          PolicyDocument:
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:*
+                Resource:
+                  - 'arn:aws:s3:::pic-sure-data-sharing-bucket*'
+                # Condition:
+                #   StringEquals:
+                #     sts:ExternalId: !Ref ExternalId
+
+  
