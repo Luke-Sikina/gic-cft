@@ -15,6 +15,30 @@ Parameters:
     Default: 12345
 
 Resources:
+#-------------------------------------------------------------------------------
+#                               Users & Access Keys
+#-------------------------------------------------------------------------------
+  DataUploadUser:
+    Type: AWS::IAM::User
+    Properties:
+      Path: "/data-upload-user/"
+      
+  DataUploadUserAccessKey:
+    Type: AWS::IAM::AccessKey
+    Properties:
+      UserName:
+        !Ref DataUploadUser
+    
+  DataUploadUserSecret:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Name: !Join ['-', [!Ref InstitutionName, data-upload-user-secret]]
+      Description: Access Key secret for Data Upload User
+      SecretString: !GetAtt DataUploadUserAccessKey.SecretAccessKey
+
+#-------------------------------------------------------------------------------
+#                                      Roles
+#-------------------------------------------------------------------------------
   # Uploaders need PUT access to the S3 bucket, but nothing else
   # Each institution has a single uploader, tied to their PIC-SURE node
   DataUploader:
@@ -26,7 +50,7 @@ Resources:
         Statement:
           - Effect: 'Allow'
             Principal:
-              AWS: 302142166944
+              AWS: !Join ['', ['arn:aws:iam::302142166944:user/data-upload-user/', !Ref DataUploadUser]]
             Action:
               - 'sts:AssumeRole'
       Policies:

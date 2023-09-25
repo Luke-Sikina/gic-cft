@@ -15,6 +15,22 @@ Parameters:
     Default: 12345
 
 Resources:
+#-------------------------------------------------------------------------------
+#                               Users & Access Keys
+#-------------------------------------------------------------------------------
+  DataUploadUser:
+    Type: AWS::IAM::User
+    Properties:
+      Path: "/data-upload-user/"
+      
+  DataUploadUserAccessKey:
+    Type: AWS::IAM::AccessKey
+    Properties:
+      UserName:
+        !Ref DataUploadUser
+#-------------------------------------------------------------------------------
+#                                      Roles
+#-------------------------------------------------------------------------------
   # Uploaders need PUT access to the S3 bucket, but nothing else
   # Each institution has a single uploader, tied to their PIC-SURE node
   DataUploader:
@@ -67,6 +83,9 @@ Resources:
                 Action:
                   - s3:*
 
+#-------------------------------------------------------------------------------
+#                                Buckets & Policies
+#-------------------------------------------------------------------------------
   # We need a bucket for uploading study data to
   StudyBucket:
     Type: AWS::S3::Bucket
