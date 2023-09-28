@@ -28,6 +28,13 @@ Resources:
     Properties:
       UserName:
         !Ref DataUploadUser
+    
+  DataUploadUserSecret:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Name: !Join ['-', [!Ref InstitutionName, data-upload-user-secret]]
+      Description: Access Key secret for Data Upload User
+      SecretString: !GetAtt DataUploadUserAccessKey.SecretAccessKey
 #-------------------------------------------------------------------------------
 #                                      Roles
 #-------------------------------------------------------------------------------
@@ -42,7 +49,10 @@ Resources:
         Statement:
           - Effect: 'Allow'
             Principal:
-              AWS: 555035503484
+              AWS:
+              - '555035503484'
+              - 'arn:aws:iam::302142166944:user/data-upload-user/phillip-DataUploadUser-1J7IZOR69QMWX'
+              - 'arn:aws:iam::555035503484:user/data-upload-user/terrance17-DataUploadUser-1OZQT9SR5MAXN'
             Action:
               - 'sts:AssumeRole'
       Policies:
@@ -53,8 +63,9 @@ Resources:
                 Action:
                   - s3:* #TODO: change back to put*
                 Resource:
-                  - 'arn:aws:s3:::pic-sure-data-sharing-bucket*'
-                # Condition:
+                  - 'arn:aws:s3:::pic-sure-data-sharing-bucketprototype'
+                  - 'arn:aws:s3:::pic-sure-data-sharing-bucketprototype*'
+                  - 'arn:aws:s3:::pic-sure-data-sharing-bucketprototype/*'                # Condition:
                 #   StringEquals:
                 #     sts:ExternalId: !Ref ExternalId
 
@@ -110,6 +121,9 @@ Resources:
   # fractured like this, but here's a policy
   StudyBucketPolicy:
     Type: AWS::S3::BucketPolicy
+    DependsOn:
+      - DataUploader
+      - SWBClient
     Properties:
       Bucket: !Join ['', ['pic-sure-data-sharing-bucket', !Ref InstitutionName]]
       PolicyDocument:
@@ -131,7 +145,8 @@ Resources:
               AWS: 
               - arn:aws:iam::555035503484:role/PicSureDataUploadRole
               - arn:aws:iam::302142166944:role/PicSureDataUploadRole
-            Action: s3:PutObject*
+            # TODO: change back to PUT
+            Action: s3:*
             Resource:
               - !Join ['', ['arn:aws:s3:::pic-sure-data-sharing-bucket', !Ref InstitutionName, '/*']]
               - !Join ['', ['arn:aws:s3:::pic-sure-data-sharing-bucket', !Ref InstitutionName]]
