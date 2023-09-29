@@ -19,6 +19,7 @@ Resources:
 #                               Users & Access Keys
 #-------------------------------------------------------------------------------
   DataUploadUser:
+  # make dep on policy
     Type: AWS::IAM::User
     Properties:
       Path: "/data-upload-user/"
@@ -36,11 +37,32 @@ Resources:
       Description: Access Key secret for Data Upload User
       SecretString: !GetAtt DataUploadUserAccessKey.SecretAccessKey
 #-------------------------------------------------------------------------------
-#                                      Roles
+#                                Roles & Policies
 #-------------------------------------------------------------------------------
+  PicSureDataUploadPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      Users:
+        - !Ref DataUploadUser
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Action:
+              - s3:PutObject*
+              - s3:DeleteObject*
+            Resource:
+              - 'arn:aws:s3:::pic-sure-data-sharing-bucketprototype'
+              - 'arn:aws:s3:::pic-sure-data-sharing-bucketprototype*'
+              - 'arn:aws:s3:::pic-sure-data-sharing-bucketprototype/*' 
+            # Condition:
+            #   StringEquals:
+            #     sts:ExternalId: !Ref ExternalId
+    
   # Uploaders need PUT access to the S3 bucket, but nothing else
   # Each institution has a single uploader, tied to their PIC-SURE node
   DataUploader:
+    DependsOn: PicSureDataUploadPolicy
     Type: AWS::IAM::Role
     Properties:
       RoleName: PicSureDataUploadRole
@@ -51,23 +73,11 @@ Resources:
             Principal:
               AWS:
               - '555035503484'
-              - 'arn:aws:iam::302142166944:user/data-upload-user/phillip-DataUploadUser-1J7IZOR69QMWX'
-              - 'arn:aws:iam::555035503484:user/data-upload-user/terrance17-DataUploadUser-1OZQT9SR5MAXN'
+              - 'arn:aws:iam::302142166944:user/data-upload-user/frank-DataUploadUser-WKWGL8C9VUBK'
+              - !Sub 'arn:aws:iam::555035503484:user/data-upload-user/${DataUploadUser}'
             Action:
               - 'sts:AssumeRole'
-      Policies:
-        - PolicyName: PicSureDataUploadPolicy 
-          PolicyDocument:
-            Statement:
-              - Effect: Allow
-                Action:
-                  - s3:* #TODO: change back to put*
-                Resource:
-                  - 'arn:aws:s3:::pic-sure-data-sharing-bucketprototype'
-                  - 'arn:aws:s3:::pic-sure-data-sharing-bucketprototype*'
-                  - 'arn:aws:s3:::pic-sure-data-sharing-bucketprototype/*'                # Condition:
-                #   StringEquals:
-                #     sts:ExternalId: !Ref ExternalId
+      Policies: []
 
   # The site owner runs a Service Workbench instance that needs
   # Fairly universal access to the S3 bucket
@@ -145,8 +155,9 @@ Resources:
               AWS: 
               - arn:aws:iam::555035503484:role/PicSureDataUploadRole
               - arn:aws:iam::302142166944:role/PicSureDataUploadRole
-            # TODO: change back to PUT
-            Action: s3:*
+            Action:
+              - s3:PutObject*
+              - s3:DeleteObject*
             Resource:
               - !Join ['', ['arn:aws:s3:::pic-sure-data-sharing-bucket', !Ref InstitutionName, '/*']]
               - !Join ['', ['arn:aws:s3:::pic-sure-data-sharing-bucket', !Ref InstitutionName]]
