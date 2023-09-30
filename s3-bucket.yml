@@ -42,8 +42,8 @@ Resources:
   PicSureDataUploadPolicy:
     Type: AWS::IAM::ManagedPolicy
     Properties:
-      Users:
-        - !Ref DataUploadUser
+      Roles:
+        - !Ref DataUploader
       PolicyDocument:
         Version: '2012-10-17'
         Statement:
@@ -62,7 +62,6 @@ Resources:
   # Uploaders need PUT access to the S3 bucket, but nothing else
   # Each institution has a single uploader, tied to their PIC-SURE node
   DataUploader:
-    DependsOn: PicSureDataUploadPolicy
     Type: AWS::IAM::Role
     Properties:
       RoleName: PicSureDataUploadRole
