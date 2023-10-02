@@ -9,11 +9,6 @@ Parameters:
     Type: String
     Description: The AWS account ID of your service workbench account
     Default: 555035503484
-  ExternalId:
-    Type: String
-    Description: A unique ID used to identify this account
-    Default: 12345
-
 Resources:
 #-------------------------------------------------------------------------------
 #                               Users & Access Keys
@@ -52,8 +47,6 @@ Resources:
               - s3:PutObject*
               - s3:DeleteObject*
             Resource:
-              - 'arn:aws:s3:::pic-sure-data-sharing-bucketprototype'
-              - 'arn:aws:s3:::pic-sure-data-sharing-bucketprototype*'
               - 'arn:aws:s3:::pic-sure-data-sharing-bucketprototype/*' 
             # Condition:
             #   StringEquals:
@@ -71,9 +64,9 @@ Resources:
           - Effect: 'Allow'
             Principal:
               AWS:
-              - '555035503484'
+              - !Ref ServiceWorkbenchAccount
               - 'arn:aws:iam::302142166944:user/data-upload-user/frank-DataUploadUser-WKWGL8C9VUBK'
-              - !Sub 'arn:aws:iam::555035503484:user/data-upload-user/${DataUploadUser}'
+              - !Sub 'arn:aws:iam::${ServiceWorkbenchAccount}:user/data-upload-user/${DataUploadUser}'
             Action:
               - 'sts:AssumeRole'
       Policies: []
@@ -89,7 +82,7 @@ Resources:
         Statement:
           - Effect: 'Allow'
             Principal:
-              AWS: 555035503484
+              AWS: !Ref ServiceWorkbenchAccount
             Action:
               - 'sts:AssumeRole'
       Policies:
@@ -111,10 +104,6 @@ Resources:
     Type: AWS::S3::Bucket
     Properties:
       BucketName: !Join ['', ['pic-sure-data-sharing-bucket', !Ref InstitutionName]]
-      # BucketEncryption:
-      #   ServerSideEncryptionConfiguration:
-      #     - ServerSideEncryptionByDefault:
-      #         SSEAlgorithm: AES256
       PublicAccessBlockConfiguration:
         BlockPublicAcls: true
         BlockPublicPolicy: true
@@ -137,7 +126,7 @@ Resources:
       Bucket: !Join ['', ['pic-sure-data-sharing-bucket', !Ref InstitutionName]]
       PolicyDocument:
         Statement:
-        # Once I have kms key, restrict here
+          # TODO: Once I have kms key, restrict here
           - Sid: Deny requests that do not use TLS/HTTPS
             Effect: Deny
             Principal: '*'
@@ -152,7 +141,7 @@ Resources:
             Effect: Allow
             Principal:
               AWS: 
-              - arn:aws:iam::555035503484:role/PicSureDataUploadRole
+              - !Sub 'arn:aws:iam::${ServiceWorkbenchAccount}:role/PicSureDataUploadRole'
               - arn:aws:iam::302142166944:role/PicSureDataUploadRole
             Action:
               - s3:PutObject*
@@ -167,7 +156,7 @@ Resources:
             Effect: Allow
             Principal:
               AWS: 
-              - arn:aws:iam::555035503484:role/SWBDataConsumerRole
+              - !Sub arn:aws:iam::${ServiceWorkbenchAccount}:role/SWBDataConsumerRole
             Action: s3:* #TODO: narrow permissions
             Resource:
               - !Join ['', ['arn:aws:s3:::pic-sure-data-sharing-bucket', !Ref InstitutionName, '/*']]
@@ -175,11 +164,3 @@ Resources:
             Condition:
               Bool:
                 aws:SecureTransport: false
-          # - Sid: Deny requests that do not use SigV4
-          #   Effect: Deny
-          #   Principal: '*'
-          #   Action: s3:*
-          #   Resource: !Join ['/', [!GetAtt LoggingBucket.Arn, '*']]
-          #   Condition:
-          #     StringNotEquals:
-          #       s3:signatureversion: 'AWS4-HMAC-SHA256'

@@ -9,10 +9,6 @@ Parameters:
     Type: String
     Description: The AWS account ID of your service workbench account
     Default: 302142166944
-  ExternalId:
-    Type: String
-    Description: A unique ID used to identify this account
-    Default: 12345
 
 Resources:
 #-------------------------------------------------------------------------------
@@ -52,8 +48,6 @@ Resources:
               - s3:PutObject*
               - s3:DeleteObject*
             Resource:
-              - 'arn:aws:s3:::pic-sure-data-sharing-bucketprototype'
-              - 'arn:aws:s3:::pic-sure-data-sharing-bucketprototype*'
               - 'arn:aws:s3:::pic-sure-data-sharing-bucketprototype/*' 
             # Condition:
             #   StringEquals:
