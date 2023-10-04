@@ -58,6 +58,8 @@ Resources:
     Type: AWS::IAM::Role
     Properties:
       RoleName: PicSureDataUploadRole
+      # unit seconds. 12 hours
+      MaxSessionDuration: 43200
       AssumeRolePolicyDocument:
         Version: '2012-10-17'
         Statement:
@@ -76,6 +78,8 @@ Resources:
   SWBClient:
     Type: AWS::IAM::Role
     Properties:
+      # unit seconds. 12 hours
+      MaxSessionDuration: 43200
       RoleName: SWBDataConsumerRole
       AssumeRolePolicyDocument:
         Version: '2012-10-17'
