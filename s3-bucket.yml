@@ -9,6 +9,10 @@ Parameters:
     Type: String
     Description: The AWS account ID of your service workbench account
     Default: 555035503484
+  ThirdPartyUploadUsers:
+    Type: List<String>
+    Description: The AWS iam IDs for the 3rd party users that will upload data
+    Default: 'arn:aws:iam::302142166944:user/data-upload-user/frank-DataUploadUser-WKWGL8C9VUBK'
 Resources:
 #-------------------------------------------------------------------------------
 #                               Users & Access Keys
@@ -34,6 +38,7 @@ Resources:
 #-------------------------------------------------------------------------------
 #                                Roles & Policies
 #-------------------------------------------------------------------------------
+  # Define what we want upload users (PIC-SUREs) to be able to do.
   PicSureDataUploadPolicy:
     Type: AWS::IAM::ManagedPolicy
     Properties:
@@ -48,27 +53,27 @@ Resources:
               - s3:DeleteObject*
             Resource:
               - 'arn:aws:s3:::pic-sure-data-sharing-bucketprototype/*' 
-            # Condition:
-            #   StringEquals:
-            #     sts:ExternalId: !Ref ExternalId
-    
-  # Uploaders need PUT access to the S3 bucket, but nothing else
-  # Each institution has a single uploader, tied to their PIC-SURE node
+  # This role is attached to the PicSureDataUploadPolicy in that policy
+  # All this role does is specify who can assume the role. What the role allows
+  # is specified in the policy, and what users _have_ assumed the role is
+  # determined at runtime, and with a 12 hour expiry
   DataUploader:
     Type: AWS::IAM::Role
     Properties:
       RoleName: PicSureDataUploadRole
-      # unit seconds. 12 hours
+      # unit = seconds. 12 hours
       MaxSessionDuration: 43200
       AssumeRolePolicyDocument:
         Version: '2012-10-17'
         Statement:
           - Effect: 'Allow'
+          # This is messy, but this is how you append to an array in CFT land:
+          # 1) Join the original array
+          # 2) Join that string and the value you want to append, using the
+          # same delimiter
+          # 3) Split that string on the shared delimiter 
             Principal:
-              AWS:
-              - !Ref ServiceWorkbenchAccount
-              - 'arn:aws:iam::302142166944:user/data-upload-user/frank-DataUploadUser-WKWGL8C9VUBK'
-              - !Sub 'arn:aws:iam::${ServiceWorkbenchAccount}:user/data-upload-user/${DataUploadUser}'
+              AWS: !Split [',', !Join [',', [!Join [',', !Ref ThirdPartyUploadUsers], !Ref ServiceWorkbenchAccount, !Sub 'arn:aws:iam::${ServiceWorkbenchAccount}:user/data-upload-user/${DataUploadUser}']]]
             Action:
               - 'sts:AssumeRole'
       Policies: []
@@ -103,7 +108,7 @@ Resources:
 #-------------------------------------------------------------------------------
 #                                Buckets & Policies
 #-------------------------------------------------------------------------------
-  # We need a bucket for uploading study data to
+  # We need a bucket for study data
   StudyBucket:
     Type: AWS::S3::Bucket
     Properties:
@@ -119,8 +124,10 @@ Resources:
         Rules:
           - ObjectOwnership: ObjectWriter
 
-  # In addition to roles, buckets have policies? Idk why authorization is 
-  # fractured like this, but here's a policy
+  # In addition to roles, buckets have policies. Policies list roles, but also
+  # fracture permissions by dictating some permissions directly, like allowed
+  # protocols. We use this policy to link our roles to the bucket, as well
+  # as to enforce encryption both on bucket and en route
   StudyBucketPolicy:
     Type: AWS::S3::BucketPolicy
     DependsOn:
