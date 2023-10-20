@@ -9,6 +9,10 @@ Parameters:
     Type: String
     Description: The AWS account ID of your service workbench account
     Default: 302142166944
+  ExternalId:
+    Type: String
+    Description: Shared secret
+    Default: 12345
 
 Resources:
 #-------------------------------------------------------------------------------
@@ -38,8 +42,8 @@ Resources:
   PicSureDataUploadPolicy:
     Type: AWS::IAM::ManagedPolicy
     Properties:
-      Users:
-        - !Ref DataUploadUser
+      Roles:
+        - !Ref DataUploader
       PolicyDocument:
         Version: '2012-10-17'
         Statement:
@@ -48,18 +52,15 @@ Resources:
               - s3:PutObject*
               - s3:DeleteObject*
             Resource:
-              - 'arn:aws:s3:::pic-sure-data-sharing-bucketprototype/*' 
-            # Condition:
-            #   StringEquals:
-            #     sts:ExternalId: !Ref ExternalId
+              - 'arn:aws:s3:::pic-sure-data-sharing-bucketprototype/*'
     
   # Uploaders need PUT access to the S3 bucket, but nothing else
   # Each institution has a single uploader, tied to their PIC-SURE node
   DataUploader:
-    DependsOn: PicSureDataUploadPolicy
     Type: AWS::IAM::Role
     Properties:
       RoleName: PicSureDataUploadRole
+      Path: '/'
       # unit seconds. 12 hours
       MaxSessionDuration: 43200
       AssumeRolePolicyDocument:
@@ -68,8 +69,10 @@ Resources:
           - Effect: 'Allow'
             Principal:
               AWS:
-              - '302142166944'
-              - !Sub 'arn:aws:iam::302142166944:user/data-upload-user/${DataUploadUser}'
+              - 'arn:aws:iam::302142166944:user/data-upload-user/frank-DataUploadUser-WKWGL8C9VUBK'
             Action:
               - 'sts:AssumeRole'
+            Condition:
+              StringEquals:
+                sts:ExternalId: !Ref ExternalId
       Policies: []
